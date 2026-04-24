@@ -80,7 +80,7 @@ def test_sync_removes_orphan_when_canonical_entry_gone(tmp_ccx_home):
     assert not cc_mcp.exists()
 
 
-def test_sync_preserves_edited_orphan_without_force(tmp_ccx_home, capsys):
+def test_sync_preserves_edited_orphan_without_force(tmp_ccx_home):
     main(["init"])
     (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
         "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
