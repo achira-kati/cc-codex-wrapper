@@ -49,7 +49,7 @@ def test_is_managed_false_when_not_in_manifest(tmp_path):
     assert m.is_managed(target) is False
 
 
-def test_orphans_returns_entries_no_longer_in_desired(tmp_path):
+def test_orphans_returns_entries_no_longer_in_desired():
     m = Manifest()
     m.record(Path("/a.txt"), "h1")
     m.record(Path("/b.txt"), "h2")
