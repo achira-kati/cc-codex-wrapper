@@ -1,0 +1,4 @@
+servers:
+  bad:
+    # no command AND no url — should fail validation
+    args: ["--flag"]
