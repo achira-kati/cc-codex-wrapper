@@ -78,3 +78,38 @@ def test_sync_removes_orphan_when_canonical_entry_gone(tmp_ccx_home):
     (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text("servers: {}\n")
     main(["sync"])
     assert not cc_mcp.exists()
+
+
+def test_sync_preserves_edited_orphan_without_force(tmp_ccx_home, capsys):
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
+        "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
+    )
+    main(["sync"])
+    hooks_json = tmp_ccx_home / ".codex" / "hooks.json"
+    assert hooks_json.exists()
+
+    # User edits the file.
+    hooks_json.write_text('{"edited": "by user"}')
+
+    # Remove hooks from canonical so the file becomes an orphan.
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text("hooks: {}\n")
+
+    main(["sync"])
+    # Edited orphan is preserved.
+    assert hooks_json.exists()
+    assert "edited" in hooks_json.read_text()
+
+
+def test_sync_force_removes_edited_orphan(tmp_ccx_home):
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
+        "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
+    )
+    main(["sync"])
+    hooks_json = tmp_ccx_home / ".codex" / "hooks.json"
+    hooks_json.write_text('{"edited": "by user"}')
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text("hooks: {}\n")
+
+    main(["sync", "--force"])
+    assert not hooks_json.exists()

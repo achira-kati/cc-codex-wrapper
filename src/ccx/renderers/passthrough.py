@@ -1,10 +1,6 @@
-import json
-import tomllib
 from pathlib import Path
 
-import tomli_w
-
-from ccx.merge import deep_merge
+from ccx.formats import merge_content
 from ccx.renderers.memory import PlannedWrite
 
 # Files handled by other renderers — never copied by passthrough.
@@ -42,7 +38,7 @@ def render_passthrough(
         native_content = source.read_text()
 
         if target in by_path:
-            merged_content = _merge_same_format(by_path[target].content, native_content, target)
+            merged_content = merge_content(by_path[target].content, native_content, target)
             new = PlannedWrite(path=target, kind="file", content=merged_content)
             idx = writes.index(by_path[target])
             writes[idx] = new
@@ -57,15 +53,3 @@ def _walk_files(root: Path):
     for p in root.rglob("*"):
         if p.is_file():
             yield p
-
-
-def _merge_same_format(portable: str, native: str, target: Path) -> str:
-    """Deep-merge portable and native content based on file extension."""
-    if target.suffix == ".json":
-        merged = deep_merge(json.loads(portable), json.loads(native))
-        return json.dumps(merged, indent=2, sort_keys=True)
-    if target.suffix == ".toml":
-        merged = deep_merge(tomllib.loads(portable), tomllib.loads(native))
-        return tomli_w.dumps(merged)
-    # Unknown format: native replaces portable entirely.
-    return native

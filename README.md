@@ -60,6 +60,23 @@ ccx leaves both alone; each tool continues to manage its own auto memory.
 - **Subagents, slash commands, plugins** — formats differ enough that a
   shared schema would be lossy.
 
+### Known limitation: `~/.claude.json` is owned wholesale (v1)
+
+ccx currently writes `~/.claude.json` (CC's user-level MCP config file) in full,
+including only the `mcpServers` key. But CC uses `~/.claude.json` for other
+state too — projects history, UI preferences, tips dismissal, etc. Running
+`ccx sync` backs up the pre-existing file but replaces it with only ccx's
+managed content, effectively resetting those other states.
+
+**Workaround until v1.1:** if you rely on CC storing state in `~/.claude.json`,
+avoid using ccx for MCP servers at user scope for now, or add your servers
+to `~/.claude/settings.json` directly via `~/.ccx/claude/settings.json`
+passthrough (note: check whether your CC version reads MCP from settings.json
+before relying on this).
+
+**Planned fix (v1.1):** change the MCP renderer to deep-merge `mcpServers`
+into existing `~/.claude.json` rather than owning the file wholesale.
+
 ## How it works
 
 `ccx sync` is pure and idempotent. It:

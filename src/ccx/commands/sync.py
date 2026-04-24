@@ -4,6 +4,7 @@ from pathlib import Path
 
 from ccx.atomic import atomic_write, replace_with_symlink
 from ccx.backup import backup_file, new_backup_dir
+from ccx.formats import merge_content
 from ccx.loader import Canonical, LoaderError, load_canonical
 from ccx.manifest import Manifest
 from ccx.renderers.hooks import render_hooks
@@ -76,12 +77,28 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
             atomic_write(w.path, w.content)
             new_manifest.record(w.path, Manifest.hash_file(w.path))
 
-    # Orphan cleanup.
+    # Orphan cleanup: preserve any orphan whose user has edited since ccx wrote it.
     for orphan in orphans:
-        if orphan.exists() or orphan.is_symlink():
+        if not (orphan.exists() or orphan.is_symlink()):
+            continue
+        recorded = manifest.entries.get(str(orphan))
+        if orphan.is_symlink() or recorded == "symlink":
             orphan.unlink()
             if not opts.quiet:
-                print(f"removed orphan {orphan}")
+                print(f"removed orphan symlink {orphan}")
+            continue
+        current = Manifest.hash_file(orphan)
+        if recorded is not None and current != recorded:
+            if not opts.force:
+                print(
+                    f"warning: orphan {orphan} was edited since ccx wrote it; "
+                    f"not removing. Re-run with --force to delete anyway.",
+                    file=sys.stderr,
+                )
+                continue
+        orphan.unlink()
+        if not opts.quiet:
+            print(f"removed orphan {orphan}")
 
     new_manifest.save(manifest_path)
     return 0
@@ -123,7 +140,35 @@ def _plan(
         writes = render_passthrough(
             scope_dir=project.root, target_root=project_root, generated_writes=writes, subdir="codex",
         )
-    return writes
+    return _coalesce_by_path(writes)
+
+
+def _coalesce_by_path(writes: list[PlannedWrite]) -> list[PlannedWrite]:
+    """Merge writes that target the same path. Preserves order of first appearance.
+
+    Symlinks are kept as-is (can't merge symlinks). File writes with the same path
+    are deep-merged via format-aware merge.
+    """
+    result: list[PlannedWrite] = []
+    by_path: dict[Path, int] = {}  # path -> index in result
+
+    for w in writes:
+        if w.path in by_path:
+            idx = by_path[w.path]
+            existing = result[idx]
+            if existing.kind == "symlink" or w.kind == "symlink":
+                # Can't meaningfully merge a symlink with anything; last write wins.
+                result[idx] = w
+            else:
+                merged_content = merge_content(existing.content, w.content, w.path)
+                result[idx] = PlannedWrite(
+                    path=w.path, kind="file", content=merged_content
+                )
+        else:
+            by_path[w.path] = len(result)
+            result.append(w)
+
+    return result
 
 
 def _print_plan(writes: list[PlannedWrite], orphans: set[Path]) -> None:
