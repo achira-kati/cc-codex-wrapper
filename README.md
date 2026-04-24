@@ -24,6 +24,156 @@ ccx sync                         # render to ~/.claude/ and ~/.codex/
 ccx claude                       # or: ccx codex
 ```
 
+## Example: one source, two outputs
+
+Here's what a typical `~/.ccx/` looks like and what `ccx sync` produces from it.
+
+### Shared memory — `~/.ccx/AGENTS.md`
+
+```markdown
+# Working agreements
+
+- Run tests before committing.
+- Prefer pnpm over npm.
+- Ask for approval before adding production dependencies.
+```
+
+Becomes:
+
+- **`~/.claude/CLAUDE.md`** — a tiny stub that CC's `@path` import expands at session start:
+  ```markdown
+  @/Users/you/.ccx/AGENTS.md
+  ```
+- **`~/.codex/AGENTS.md`** — owned copy of the same content (Codex has no include mechanism, so ccx writes a copy and backs up anything that was there before).
+
+### Skills — `~/.ccx/skills/<name>/SKILL.md`
+
+```
+~/.ccx/skills/
+└── commit-message/
+    └── SKILL.md
+```
+
+With `SKILL.md`:
+```markdown
+---
+name: commit-message
+description: Write a commit message following the repo's conventions.
+---
+
+Look at recent commits, match the prevailing style...
+```
+
+Becomes two symlinks pointing at the same canonical dir — no translation:
+
+- `~/.claude/skills` → `~/.ccx/skills`
+- `~/.agents/skills` → `~/.ccx/skills`
+
+### MCP servers — `~/.ccx/mcp.yaml`
+
+```yaml
+servers:
+  context7:
+    command: npx
+    args: ["-y", "@upstash/context7-mcp"]
+  figma:
+    url: "https://mcp.figma.com/mcp"
+    bearer_token_env_var: FIGMA_OAUTH_TOKEN
+```
+
+Becomes:
+
+- **`~/.claude.json`** (CC user-level MCP):
+  ```json
+  {
+    "mcpServers": {
+      "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp"]},
+      "figma": {"url": "https://mcp.figma.com/mcp"}
+    }
+  }
+  ```
+- **`~/.codex/config.toml`**:
+  ```toml
+  [mcp_servers.context7]
+  command = "npx"
+  args = ["-y", "@upstash/context7-mcp"]
+
+  [mcp_servers.figma]
+  url = "https://mcp.figma.com/mcp"
+  bearer_token_env_var = "FIGMA_OAUTH_TOKEN"
+  ```
+
+### Hooks — `~/.ccx/hooks.yaml` (6 shared events)
+
+```yaml
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - command: "$HOME/.ccx/hooks/pre_bash.py"
+          timeout: 30
+  SessionStart:
+    - hooks:
+        - command: "echo 'session starting'"
+```
+
+Becomes:
+
+- **`~/.claude/settings.json`** — CC reads the `hooks` key verbatim:
+  ```json
+  {
+    "hooks": {
+      "PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "...", "timeout": 30}]}],
+      "SessionStart": [{"hooks": [{"command": "echo 'session starting'"}]}]
+    }
+  }
+  ```
+- **`~/.codex/hooks.json`** — same structure, with `"type": "command"` injected (Codex requires it):
+  ```json
+  {
+    "hooks": {
+      "PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "...", "timeout": 30}]}],
+      "SessionStart": [{"hooks": [{"type": "command", "command": "echo 'session starting'"}]}]
+    }
+  }
+  ```
+- **`~/.codex/config.toml`** also gets `[features] codex_hooks = true` because Codex hooks are opt-in.
+
+### Tool-native passthrough
+
+For things that don't translate (CC permissions, Codex sandbox rules), drop the native file under `~/.ccx/claude/` or `~/.ccx/codex/` and ccx copies or deep-merges it through.
+
+**`~/.ccx/claude/settings.json`** — CC permissions (CC-only; merged into `~/.claude/settings.json` alongside the hooks block ccx generated):
+```json
+{
+  "permissions": {
+    "allow": ["Bash(git *)", "Bash(pnpm *)"],
+    "deny": ["Bash(rm -rf *)"]
+  }
+}
+```
+
+**`~/.ccx/codex/rules/default.rules`** — Codex Starlark rules (copied as-is to `~/.codex/rules/default.rules`):
+```python
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "Review before pushing.",
+)
+```
+
+**`~/.ccx/codex/config.toml`** — Codex sandbox (merged into `~/.codex/config.toml` alongside the `mcp_servers` and `features` sections):
+```toml
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+```
+
+### Project scope
+
+Put the same shape under `.ccx/` in a repo. Project entries override user entries for MCP (by server name) and append for hooks (under the same event). Targets go to the repo root: `./CLAUDE.md`, `./AGENTS.md` (symlink to `.ccx/AGENTS.md`), `./.mcp.json`, `./.codex/config.toml`, `./.claude/settings.json`, `./.codex/hooks.json`.
+
+---
+
 ## What's in scope
 
 | Concept | Where to put it |
