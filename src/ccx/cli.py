@@ -22,7 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     sync_p.add_argument("--quiet", action="store_true")
 
     subparsers.add_parser("status", help="Show drift between canonical and targets")
-    subparsers.add_parser("restore", help="Restore from a backup snapshot")
+    restore_p = subparsers.add_parser("restore", help="Restore from a backup snapshot")
+    restore_p.add_argument("--list", action="store_true")
     subparsers.add_parser("claude", help="Sync then exec claude")
     subparsers.add_parser("codex", help="Sync then exec codex")
 
@@ -50,6 +51,18 @@ def main(argv: list[str] | None = None) -> int:
             return rc
         opts = cmd_sync.SyncOptions(dry_run=args.dry_run, force=args.force, quiet=args.quiet)
         return cmd_sync.run(scopes, home=home, project_root=project_root, opts=opts)
+
+    if args.command == "claude":
+        from ccx.commands import launcher
+        return launcher.run("claude", rest, scopes, home=home, project_root=project_root)
+
+    if args.command == "codex":
+        from ccx.commands import launcher
+        return launcher.run("codex", rest, scopes, home=home, project_root=project_root)
+
+    if args.command == "restore":
+        from ccx.commands import restore as cmd_restore
+        return cmd_restore.run(scopes.user, list_only=args.list, home=home)
 
     if args.command is None:
         parser.print_help()
