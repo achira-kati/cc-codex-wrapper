@@ -1,7 +1,3 @@
-from pathlib import Path
-
-import pytest
-
 from ccx.atomic import atomic_write, replace_with_symlink
 
 

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from ccx.backup import backup_file, new_backup_dir
 
 
