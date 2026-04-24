@@ -2,6 +2,8 @@ import argparse
 import sys
 
 from ccx import __version__
+from ccx.commands import init as cmd_init
+from ccx.scope import discover
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -15,8 +17,14 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("claude", help="Sync then exec claude")
     subparsers.add_parser("codex", help="Sync then exec codex")
     args, rest = parser.parse_known_args(argv)
+
+    if args.command == "init":
+        scopes = discover()
+        return cmd_init.run(scopes.user)
+
     if args.command is None:
         parser.print_help()
         return 0
+
     print(f"ccx: '{args.command}' not yet implemented", file=sys.stderr)
     return 1
