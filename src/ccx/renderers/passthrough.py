@@ -27,7 +27,7 @@ def render_passthrough(
     """
     passthrough_root = scope_dir / subdir
     if not passthrough_root.is_dir():
-        return []
+        return list(generated_writes)
 
     target_subdir = ".claude" if subdir == "claude" else ".codex"
     by_path = {w.path: w for w in generated_writes}
