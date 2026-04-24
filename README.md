@@ -168,9 +168,124 @@ sandbox_mode = "workspace-write"
 approval_policy = "on-request"
 ```
 
-### Project scope
+---
 
-Put the same shape under `.ccx/` in a repo. Project entries override user entries for MCP (by server name) and append for hooks (under the same event). Targets go to the repo root: `./CLAUDE.md`, `./AGENTS.md` (symlink to `.ccx/AGENTS.md`), `./.mcp.json`, `./.codex/config.toml`, `./.claude/settings.json`, `./.codex/hooks.json`.
+## Project-level setup
+
+Project-scope looks identical to user-scope — just under `.ccx/` at the repo root instead of `~/.ccx/`. Commit `.ccx/` so your team shares the same config; everything else is generated and should be ignored.
+
+### Layout to commit
+
+```
+my-project/
+└── .ccx/
+    ├── AGENTS.md            # project memory (team shares this)
+    ├── mcp.yaml             # project-specific MCP servers
+    ├── hooks.yaml           # project hooks
+    ├── skills/
+    │   └── run-migrations/
+    │       └── SKILL.md
+    ├── claude/
+    │   └── settings.json    # project permissions, CC-only settings
+    └── codex/
+        └── rules/
+            └── default.rules
+```
+
+### What ccx generates in the repo
+
+After `ccx sync` (from anywhere inside the repo — ccx walks up to find `.ccx/`):
+
+```
+my-project/
+├── CLAUDE.md            # generated: @AGENTS.md stub
+├── AGENTS.md            # generated: symlink → .ccx/AGENTS.md
+├── .mcp.json            # generated: CC project MCP servers
+├── .claude/
+│   ├── settings.json    # generated hooks block + your permissions (deep-merged)
+│   └── skills/          # symlink → ../.ccx/skills
+├── .codex/
+│   ├── config.toml      # generated: [mcp_servers.*] + [features] + your sandbox config
+│   ├── hooks.json       # generated
+│   └── rules/           # copied from .ccx/codex/rules/
+├── .agents/
+│   └── skills/          # symlink → ../.ccx/skills
+└── .ccx/                # your source (committed)
+```
+
+### Recommended `.gitignore` additions
+
+Add these to your repo's `.gitignore` so teammates don't commit generated or machine-local files:
+
+```gitignore
+# ccx local state (per-dev, not shared)
+.ccx/.state/
+.ccx/backups/
+
+# ccx-generated — regenerated from .ccx/ on every `ccx sync`
+/CLAUDE.md
+/AGENTS.md
+/.mcp.json
+/.claude/
+/.codex/
+/.agents/
+```
+
+The leading `/` anchors each rule to the repo root — important if you also have nested `CLAUDE.md`, `.claude/`, or similar paths that you *do* want to track (e.g. test fixtures).
+
+If you want teammates to see CC/Codex's own `settings.local.json` per-dev files but not commit them, add:
+
+```gitignore
+.claude/settings.local.json
+.codex/settings.local.json
+```
+
+### Merge rules: project + user
+
+When you have both `~/.ccx/` and `./.ccx/`, they combine per concept:
+
+| Concept | Rule |
+|---|---|
+| **MCP servers** | Project overrides user **by server name** in the project output. User's own outputs are unchanged. |
+| **Hooks** | Project entries **append** under the same event in the project output. |
+| **Memory** | No cross-scope merge — both tools already load user + project `AGENTS.md`/`CLAUDE.md` hierarchically. |
+| **Skills** | User and project target symlinks each point at their own canonical dir. |
+| **Passthrough** | Project `.ccx/claude/...` renders to `./.claude/...`; user's to `~/.claude/...`. The tools' settings hierarchy handles final layering. |
+
+### First-time setup for a new project
+
+```bash
+cd my-project
+mkdir -p .ccx/{skills,claude,codex/rules}
+
+cat > .ccx/AGENTS.md <<'EOF'
+# Project conventions
+- Tests: `pnpm test`
+- Type check: `pnpm typecheck`
+- Never push to main directly.
+EOF
+
+cat > .ccx/mcp.yaml <<'EOF'
+servers:
+  project-db-mcp:
+    command: ./scripts/mcp-server.sh
+    env:
+      DATABASE_URL: "$DATABASE_URL"
+EOF
+
+cat > .ccx/claude/settings.json <<'EOF'
+{"permissions": {"allow": ["Bash(pnpm *)"], "deny": ["Bash(rm -rf *)"]}}
+EOF
+
+# See "Recommended .gitignore additions" above.
+$EDITOR .gitignore
+
+ccx sync
+git add .ccx .gitignore
+git commit -m "chore: ccx project config"
+```
+
+Teammates clone, run `ccx sync` once, and their `claude` / `codex` see the same project state.
 
 ---
 
