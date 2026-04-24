@@ -67,17 +67,18 @@ def test_sync_dry_run_does_not_write(tmp_ccx_home):
 
 
 def test_sync_removes_orphan_when_canonical_entry_gone(tmp_ccx_home):
+    # Use .codex/config.toml (owned mode) to test orphan removal.
     main(["init"])
     (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
         yaml.dump({"servers": {"s1": {"command": "npx"}}})
     )
     main(["sync"])
-    cc_mcp = tmp_ccx_home / ".claude.json"
-    assert cc_mcp.is_file()
+    codex_toml = tmp_ccx_home / ".codex" / "config.toml"
+    assert codex_toml.is_file()
 
     (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text("servers: {}\n")
     main(["sync"])
-    assert not cc_mcp.exists()
+    assert not codex_toml.exists()
 
 
 def test_sync_preserves_edited_orphan_without_force(tmp_ccx_home):
@@ -113,3 +114,92 @@ def test_sync_force_removes_edited_orphan(tmp_ccx_home):
 
     main(["sync", "--force"])
     assert not hooks_json.exists()
+
+
+def test_claude_json_merge_preserves_existing_cc_state(tmp_ccx_home):
+    """CC state in ~/.claude.json must survive ccx sync."""
+    import yaml
+
+    # Simulate CC's pre-existing state.
+    claude_json = tmp_ccx_home / ".claude.json"
+    claude_json.write_text(json.dumps({
+        "projects": {"/path/to/repo": {"lastOpened": "2026-01-01"}},
+        "autoConnectIde": True,
+    }))
+
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    assert main(["sync"]) == 0
+
+    data = json.loads(claude_json.read_text())
+    # CC state preserved:
+    assert "projects" in data
+    assert data["projects"]["/path/to/repo"]["lastOpened"] == "2026-01-01"
+    assert data["autoConnectIde"] is True
+    # ccx's mcpServers added:
+    assert "mcpServers" in data
+    assert data["mcpServers"]["s1"]["command"] == "npx"
+
+
+def test_claude_json_merge_no_backup_created(tmp_ccx_home):
+    """Merge-mode should not create a backup (non-destructive)."""
+    import yaml
+
+    tmp_ccx_home.mkdir(exist_ok=True)
+    claude_json = tmp_ccx_home / ".claude.json"
+    claude_json.write_text(json.dumps({"some": "state"}))
+
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    main(["sync"])
+
+    # Backups dir should not contain .claude.json (but may have other files).
+    backups = list((tmp_ccx_home / ".ccx" / "backups").glob("**/.claude.json"))
+    assert backups == []
+
+
+def test_claude_json_merge_accepts_cc_rewrites_between_syncs(tmp_ccx_home):
+    """If CC rewrites ~/.claude.json between syncs, ccx re-merges without error."""
+    import yaml
+
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    assert main(["sync"]) == 0
+
+    # Simulate CC rewriting the file with a new key.
+    claude_json = tmp_ccx_home / ".claude.json"
+    data = json.loads(claude_json.read_text())
+    data["newKeyFromCC"] = "added by cc"
+    claude_json.write_text(json.dumps(data))
+
+    # Second sync should not error and should preserve CC's addition.
+    assert main(["sync"]) == 0
+    data = json.loads(claude_json.read_text())
+    assert data["newKeyFromCC"] == "added by cc"
+    assert "mcpServers" in data
+
+
+def test_claude_json_orphan_not_unlinked_when_merge_mode(tmp_ccx_home):
+    """If canonical loses all MCP, merge-mode file is NOT unlinked."""
+    import yaml
+
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    main(["sync"])
+    claude_json = tmp_ccx_home / ".claude.json"
+    assert claude_json.exists()
+
+    # Remove MCP from canonical.
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text("servers: {}\n")
+    main(["sync"])
+
+    # File should still exist — we don't own it wholesale.
+    assert claude_json.exists()

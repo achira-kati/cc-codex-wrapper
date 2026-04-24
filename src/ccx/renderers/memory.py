@@ -12,6 +12,7 @@ class PlannedWrite:
     kind: Literal["file", "symlink"]
     content: str = ""
     symlink_to: Path | None = None
+    mode: Literal["owned", "merge"] = "owned"
 
 
 def render_memory(

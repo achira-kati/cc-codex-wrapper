@@ -18,7 +18,7 @@ def render_mcp(
 
     if user_servers:
         cc_content = json.dumps({"mcpServers": _to_cc(user_servers)}, indent=2, sort_keys=True)
-        writes.append(PlannedWrite(path=home / ".claude.json", kind="file", content=cc_content))
+        writes.append(PlannedWrite(path=home / ".claude.json", kind="file", content=cc_content, mode="merge"))
 
         codex_content = tomli_w.dumps({"mcp_servers": _to_codex(user_servers)})
         writes.append(PlannedWrite(path=home / ".codex" / "config.toml", kind="file", content=codex_content))

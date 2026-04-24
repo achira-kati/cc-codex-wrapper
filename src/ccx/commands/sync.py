@@ -40,8 +40,13 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
     # Drift detection for non-force runs.
     if not opts.force:
         for w in writes:
+            if w.mode == "merge":
+                continue  # merge-mode: external edits are expected
             if w.path.exists() and str(w.path) in manifest.entries and not w.path.is_symlink():
-                if Manifest.hash_file(w.path) != manifest.entries[str(w.path)]:
+                recorded = manifest.entries[str(w.path)]
+                if recorded in ("symlink", "merge"):
+                    continue
+                if Manifest.hash_file(w.path) != recorded:
                     print(
                         f"manual edit detected at {w.path}. "
                         f"Re-run with --force to overwrite, or move the change into canonical.",
@@ -56,6 +61,8 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
     # Backup phase: any existing target that isn't ccx-managed gets moved aside.
     backup_dir = None
     for w in writes:
+        if w.mode == "merge":
+            continue
         if w.path.exists() and not w.path.is_symlink():
             if str(w.path) not in manifest.entries:
                 if backup_dir is None:
@@ -73,6 +80,11 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
             replace_with_symlink(w.path, w.symlink_to)
             # Symlinks aren't hash-tracked; record with a sentinel.
             new_manifest.record(w.path, "symlink")
+        elif w.mode == "merge":
+            existing = _read_existing_or_empty(w.path)
+            merged = merge_content(existing, w.content, w.path) if existing else w.content
+            atomic_write(w.path, merged)
+            new_manifest.record(w.path, "merge")
         else:
             atomic_write(w.path, w.content)
             new_manifest.record(w.path, Manifest.hash_file(w.path))
@@ -82,6 +94,9 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
         if not (orphan.exists() or orphan.is_symlink()):
             continue
         recorded = manifest.entries.get(str(orphan))
+        if recorded == "merge":
+            # Was merge-mode; we don't own it. Skip entirely.
+            continue
         if orphan.is_symlink() or recorded == "symlink":
             orphan.unlink()
             if not opts.quiet:
@@ -161,8 +176,10 @@ def _coalesce_by_path(writes: list[PlannedWrite]) -> list[PlannedWrite]:
                 result[idx] = w
             else:
                 merged_content = merge_content(existing.content, w.content, w.path)
+                # Preserve merge mode if either write is merge-mode.
+                coalesced_mode = "merge" if (existing.mode == "merge" or w.mode == "merge") else "owned"
                 result[idx] = PlannedWrite(
-                    path=w.path, kind="file", content=merged_content
+                    path=w.path, kind="file", content=merged_content, mode=coalesced_mode
                 )
         else:
             by_path[w.path] = len(result)
@@ -190,3 +207,12 @@ def _is_under(path: Path, root: Path) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _read_existing_or_empty(path: Path) -> str:
+    if not path.exists() or path.is_symlink():
+        return ""
+    try:
+        return path.read_text()
+    except (OSError, UnicodeDecodeError):
+        return ""
