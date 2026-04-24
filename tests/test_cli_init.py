@@ -30,7 +30,7 @@ def test_init_scaffolds_valid_starter_mcp_yaml(tmp_ccx_home):
     assert data == {"servers": {}}
 
 
-def test_init_project_creates_local_ccx_dir(tmp_ccx_home, tmp_path, monkeypatch):
+def test_init_project_creates_local_ccx_dir(_tmp_ccx_home, tmp_path, monkeypatch):
     project = tmp_path / "repo"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -47,7 +47,7 @@ def test_init_project_creates_local_ccx_dir(tmp_ccx_home, tmp_path, monkeypatch)
     assert (scope / ".gitignore").is_file()
 
 
-def test_init_project_appends_to_gitignore(tmp_ccx_home, tmp_path, monkeypatch):
+def test_init_project_appends_to_gitignore(_tmp_ccx_home, tmp_path, monkeypatch):
     project = tmp_path / "repo"
     project.mkdir()
     # Pre-existing .gitignore with unrelated content.
@@ -62,7 +62,7 @@ def test_init_project_appends_to_gitignore(tmp_ccx_home, tmp_path, monkeypatch):
     assert "/.claude/" in content
 
 
-def test_init_project_creates_gitignore_if_missing(tmp_ccx_home, tmp_path, monkeypatch):
+def test_init_project_creates_gitignore_if_missing(_tmp_ccx_home, tmp_path, monkeypatch):
     project = tmp_path / "repo"
     project.mkdir()
     monkeypatch.chdir(project)
@@ -73,7 +73,7 @@ def test_init_project_creates_gitignore_if_missing(tmp_ccx_home, tmp_path, monke
     assert "# --- ccx (managed) ---" in content
 
 
-def test_init_project_is_idempotent_for_gitignore(tmp_ccx_home, tmp_path, monkeypatch):
+def test_init_project_is_idempotent_for_gitignore(_tmp_ccx_home, tmp_path, monkeypatch):
     project = tmp_path / "repo"
     project.mkdir()
     monkeypatch.chdir(project)
