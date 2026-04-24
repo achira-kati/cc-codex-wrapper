@@ -13,7 +13,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ccx", description="One config source for Claude Code and Codex")
     parser.add_argument("--version", action="version", version=f"ccx {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=False)
-    subparsers.add_parser("init", help="Scaffold ~/.ccx/")
+    init_p = subparsers.add_parser("init", help="Scaffold ~/.ccx/ (or .ccx/ with --project)")
+    init_p.add_argument("--project", action="store_true", help="Scaffold .ccx/ in CWD instead of ~/.ccx/")
 
     sync_p = subparsers.add_parser("sync", help="Render canonical -> native targets")
     sync_p.add_argument("--dry-run", action="store_true")
@@ -34,7 +35,9 @@ def main(argv: list[str] | None = None) -> int:
     project_root = scopes.project.parent if scopes.project else None
 
     if args.command == "init":
-        return cmd_init.run(scopes.user)
+        if args.project:
+            return cmd_init.run(Path.cwd() / ".ccx", is_project=True)
+        return cmd_init.run(scopes.user, is_project=False)
 
     if args.command == "status":
         from ccx.commands import status as cmd_status

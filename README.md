@@ -215,6 +215,8 @@ my-project/
 
 ### Recommended `.gitignore` additions
 
+`ccx init --project` adds these entries automatically (inside a marker block). You only need to add them manually if you're migrating a project that wasn't created via `ccx init --project`.
+
 Add these to your repo's `.gitignore` so teammates don't commit generated or machine-local files:
 
 ```gitignore
@@ -256,29 +258,12 @@ When you have both `~/.ccx/` and `./.ccx/`, they combine per concept:
 
 ```bash
 cd my-project
-mkdir -p .ccx/{skills,claude,codex/rules}
+ccx init --project              # creates .ccx/ + appends ccx block to .gitignore
 
-cat > .ccx/AGENTS.md <<'EOF'
-# Project conventions
-- Tests: `pnpm test`
-- Type check: `pnpm typecheck`
-- Never push to main directly.
-EOF
-
-cat > .ccx/mcp.yaml <<'EOF'
-servers:
-  project-db-mcp:
-    command: ./scripts/mcp-server.sh
-    env:
-      DATABASE_URL: "$DATABASE_URL"
-EOF
-
-cat > .ccx/claude/settings.json <<'EOF'
-{"permissions": {"allow": ["Bash(pnpm *)"], "deny": ["Bash(rm -rf *)"]}}
-EOF
-
-# See "Recommended .gitignore additions" above.
-$EDITOR .gitignore
+# Customize the starter files:
+$EDITOR .ccx/AGENTS.md
+$EDITOR .ccx/mcp.yaml
+$EDITOR .ccx/claude/settings.json    # if you want project permissions
 
 ccx sync
 git add .ccx .gitignore
@@ -346,7 +331,8 @@ intact).
 
 | Command | Purpose |
 |---|---|
-| `ccx init` | Scaffold `~/.ccx/` with starter files |
+| `ccx init` | Scaffold `~/.ccx/` (user scope) with starter files |
+| `ccx init --project` | Scaffold `.ccx/` in CWD and update repo `.gitignore` |
 | `ccx sync` | Render canonical → targets |
 | `ccx sync --dry-run` | Print plan without writing |
 | `ccx sync --check` | Exit non-zero if drift exists (for pre-commit / CI) |
