@@ -42,3 +42,27 @@ def test_empty_inputs():
     assert deep_merge({}, {"a": 1}) == {"a": 1}
     assert deep_merge({"a": 1}, {}) == {"a": 1}
     assert deep_merge({}, {}) == {}
+
+
+def test_mutating_result_does_not_mutate_inputs():
+    left = {"a": {"nested": 1}, "only_left": [1, 2]}
+    right = {"a": {"extra": 2}, "only_right": {"k": "v"}}
+    result = deep_merge(left, right)
+
+    # Mutate every reachable mutable in `result`.
+    result["a"]["nested"] = 999
+    result["only_left"].append(99)
+    result["only_right"]["k"] = "mutated"
+
+    # Originals are untouched.
+    assert left == {"a": {"nested": 1}, "only_left": [1, 2]}
+    assert right == {"a": {"extra": 2}, "only_right": {"k": "v"}}
+
+
+def test_list_result_is_independent_of_inputs():
+    left = [[1], [2]]
+    right = [[3]]
+    result = deep_merge(left, right)
+    result[0].append(99)
+    assert left == [[1], [2]]
+    assert right == [[3]]
