@@ -1,0 +1,9 @@
+hooks:
+  PreToolUse:
+    - matcher: Bash
+      hooks:
+        - command: "$CCX_DIR/hooks/pre_bash.py"
+          timeout: 30
+  SessionStart:
+    - hooks:
+        - command: "echo hello"
