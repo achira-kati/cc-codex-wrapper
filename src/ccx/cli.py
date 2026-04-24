@@ -35,8 +35,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "init":
         return cmd_init.run(scopes.user)
 
+    if args.command == "status":
+        from ccx.commands import status as cmd_status
+        rc, summary = cmd_status.run(scopes, home=home, project_root=project_root)
+        print(summary, end="")
+        # Status is informational: always exit 0.
+        return 0
+
     if args.command == "sync":
-        # --check is handled in Task 14; for now ignore if passed alone
+        if args.check:
+            from ccx.commands import status as cmd_status
+            rc, summary = cmd_status.run(scopes, home=home, project_root=project_root)
+            print(summary, end="")
+            return rc
         opts = cmd_sync.SyncOptions(dry_run=args.dry_run, force=args.force, quiet=args.quiet)
         return cmd_sync.run(scopes, home=home, project_root=project_root, opts=opts)
 
