@@ -119,16 +119,16 @@ hooks:
 
 Becomes:
 
-- **`~/.claude/settings.json`** — CC reads the `hooks` key verbatim:
+- **`~/.claude/settings.json`** — Claude Code command hooks include `"type": "command"`:
   ```json
   {
     "hooks": {
-      "PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "...", "timeout": 30}]}],
-      "SessionStart": [{"hooks": [{"command": "echo 'session starting'"}]}]
+      "PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "...", "timeout": 30}]}],
+      "SessionStart": [{"hooks": [{"type": "command", "command": "echo 'session starting'"}]}]
     }
   }
   ```
-- **`~/.codex/hooks.json`** — same structure, with `"type": "command"` injected (Codex requires it):
+- **`~/.codex/hooks.json`** — same structure, with `"type": "command"` injected:
   ```json
   {
     "hooks": {

@@ -39,12 +39,16 @@ def render_hooks(
 
 
 def _cc_shape(hooks: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
-    """CC accepts canonical structure verbatim."""
-    return hooks
+    """Claude Code requires 'type': 'command' on each command hook."""
+    return _command_hook_shape(hooks)
 
 
 def _codex_shape(hooks: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
     """Codex requires 'type': 'command' on each handler."""
+    return _command_hook_shape(hooks)
+
+
+def _command_hook_shape(hooks: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
     out: dict[str, list[dict[str, Any]]] = {}
     for event, matchers in hooks.items():
         new_matchers: list[dict[str, Any]] = []

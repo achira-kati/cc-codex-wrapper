@@ -53,6 +53,11 @@ def test_project_hooks_append_to_user_hooks_under_same_event():
     data = json.loads(proj_cc.content)
     matchers = [m["matcher"] for m in data["hooks"]["PreToolUse"]]
     assert matchers == ["Bash", "Edit"]
+    handlers = [m["hooks"][0] for m in data["hooks"]["PreToolUse"]]
+    assert handlers == [
+        {"type": "command", "command": "user_cmd"},
+        {"type": "command", "command": "project_cmd"},
+    ]
 
 
 def test_empty_hooks_produces_no_writes():
