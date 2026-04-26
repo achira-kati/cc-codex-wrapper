@@ -21,8 +21,12 @@ def main(argv: list[str] | None = None) -> int:
     sync_p.add_argument("--force", action="store_true")
     sync_p.add_argument("--check", action="store_true", help="Exit non-zero if targets are stale")
     sync_p.add_argument("--quiet", action="store_true")
+    target_group = sync_p.add_mutually_exclusive_group()
+    target_group.add_argument("--claude", action="store_true", help="Sync only Claude targets")
+    target_group.add_argument("--codex", action="store_true", help="Sync only Codex targets")
 
     subparsers.add_parser("status", help="Show drift between canonical and targets")
+    subparsers.add_parser("clean", help="Remove generated targets after a clean status check")
     restore_p = subparsers.add_parser("restore", help="Restore from a backup snapshot")
     restore_p.add_argument("--list", action="store_true")
     subparsers.add_parser("claude", help="Sync then exec claude")
@@ -47,13 +51,22 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "sync":
+        target = "claude" if args.claude else "codex" if args.codex else "all"
         if args.check:
             from ccx.commands import status as cmd_status
-            rc, summary = cmd_status.run(scopes, home=home, project_root=project_root)
+            rc, summary = cmd_status.run(
+                scopes, home=home, project_root=project_root, target=target
+            )
             print(summary, end="")
             return rc
-        opts = cmd_sync.SyncOptions(dry_run=args.dry_run, force=args.force, quiet=args.quiet)
+        opts = cmd_sync.SyncOptions(
+            dry_run=args.dry_run, force=args.force, quiet=args.quiet, target=target
+        )
         return cmd_sync.run(scopes, home=home, project_root=project_root, opts=opts)
+
+    if args.command == "clean":
+        from ccx.commands import clean as cmd_clean
+        return cmd_clean.run(scopes, home=home, project_root=project_root)
 
     if args.command == "claude":
         from ccx.commands import launcher

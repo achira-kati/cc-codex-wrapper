@@ -1,6 +1,7 @@
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from ccx.atomic import atomic_write, replace_with_symlink
 from ccx.backup import backup_file, new_backup_dir
@@ -14,12 +15,16 @@ from ccx.renderers.passthrough import render_passthrough
 from ccx.renderers.skills import render_skills
 from ccx.scope import Scopes
 
+TargetFilter = Literal["all", "claude", "codex"]
+TargetName = Literal["claude", "codex"]
+
 
 @dataclass
 class SyncOptions:
     dry_run: bool = False
     force: bool = False
     quiet: bool = False
+    target: TargetFilter = "all"
 
 
 def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions) -> int:
@@ -30,12 +35,17 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
         print(f"canonical validation failed: {e}", file=sys.stderr)
         return 2
 
-    writes = _plan(user=user, project=project, home=home, project_root=project_root)
+    all_writes = _plan(user=user, project=project, home=home, project_root=project_root)
+    writes = _filter_writes_for_target(
+        all_writes, target=opts.target, home=home, project_root=project_root
+    )
     manifest_path = scopes.user / ".state" / "manifest.json"
     manifest = Manifest.load(manifest_path)
 
     desired_paths = {w.path for w in writes}
-    orphans = manifest.orphans(desired_paths)
+    orphans = _orphans_for_target(
+        manifest, desired_paths, target=opts.target, home=home, project_root=project_root
+    )
 
     # Drift detection for non-force runs.
     if not opts.force:
@@ -73,7 +83,11 @@ def run(scopes: Scopes, home: Path, project_root: Path | None, opts: SyncOptions
                     print(f"backed up {w.path} -> {backup_dir}")
 
     # Write phase.
-    new_manifest = Manifest()
+    new_manifest = Manifest(
+        entries=_preserve_unselected_entries(
+            manifest, target=opts.target, home=home, project_root=project_root
+        )
+    )
     for w in writes:
         if w.kind == "symlink":
             assert w.symlink_to is not None
@@ -186,6 +200,92 @@ def _coalesce_by_path(writes: list[PlannedWrite]) -> list[PlannedWrite]:
             result.append(w)
 
     return result
+
+
+def _filter_writes_for_target(
+    writes: list[PlannedWrite],
+    *,
+    target: TargetFilter,
+    home: Path,
+    project_root: Path | None,
+) -> list[PlannedWrite]:
+    if target == "all":
+        return writes
+    selected = {target}
+    return [
+        w
+        for w in writes
+        if _path_targets(w.path, home=home, project_root=project_root) & selected
+    ]
+
+
+def _orphans_for_target(
+    manifest: Manifest,
+    desired_paths: set[Path],
+    *,
+    target: TargetFilter,
+    home: Path,
+    project_root: Path | None,
+) -> set[Path]:
+    if target == "all":
+        return manifest.orphans(desired_paths)
+
+    desired_str = {str(p) for p in desired_paths}
+    return {
+        Path(path)
+        for path in manifest.entries
+        if path not in desired_str
+        and _path_targets(Path(path), home=home, project_root=project_root) & {target}
+    }
+
+
+def _preserve_unselected_entries(
+    manifest: Manifest,
+    *,
+    target: TargetFilter,
+    home: Path,
+    project_root: Path | None,
+) -> dict[str, str]:
+    if target == "all":
+        return {}
+    return {
+        path: recorded
+        for path, recorded in manifest.entries.items()
+        if not (_path_targets(Path(path), home=home, project_root=project_root) & {target})
+    }
+
+
+def _path_targets(path: Path, *, home: Path, project_root: Path | None) -> set[TargetName]:
+    targets: set[TargetName] = set()
+
+    if path == home / ".claude.json" or _is_under_path(path, home / ".claude"):
+        targets.add("claude")
+    if _is_under_path(path, home / ".codex") or _is_under_path(path, home / ".agents"):
+        targets.add("codex")
+
+    if project_root is not None:
+        if (
+            path == project_root / "CLAUDE.md"
+            or path == project_root / ".mcp.json"
+            or _is_under_path(path, project_root / ".claude")
+        ):
+            targets.add("claude")
+        if path == project_root / "AGENTS.md":
+            targets.update({"claude", "codex"})
+        if _is_under_path(path, project_root / ".codex") or _is_under_path(
+            path, project_root / ".agents"
+        ):
+            targets.add("codex")
+
+    return targets
+
+
+def _is_under_path(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
 
 
 def _print_plan(writes: list[PlannedWrite], orphans: set[Path]) -> None:

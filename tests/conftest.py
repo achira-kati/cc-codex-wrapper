@@ -7,4 +7,5 @@ def tmp_ccx_home(tmp_path, monkeypatch):
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.chdir(tmp_path)
     return fake_home

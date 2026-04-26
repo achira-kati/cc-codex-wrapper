@@ -1,3 +1,5 @@
+import json
+
 import yaml
 
 from ccx.cli import main
@@ -15,6 +17,14 @@ def test_init_creates_scope_directory(tmp_ccx_home):
     assert (scope / "claude").is_dir()
     assert (scope / "codex").is_dir()
     assert (scope / ".gitignore").is_file()
+
+
+def test_init_starter_agents_describes_ccx_folder(tmp_ccx_home):
+    main(["init"])
+
+    content = (tmp_ccx_home / ".ccx" / "AGENTS.md").read_text()
+    assert "## What is `.ccx`?" in content
+    assert ".ccx is the source folder for shared Claude Code and Codex config." in content
 
 
 def test_init_is_idempotent(tmp_ccx_home):
@@ -45,6 +55,30 @@ def test_init_project_creates_local_ccx_dir(tmp_ccx_home, tmp_path, monkeypatch)
     assert (scope / "claude").is_dir()
     assert (scope / "codex").is_dir()
     assert (scope / ".gitignore").is_file()
+
+
+def test_init_project_creates_vscode_settings_to_hide_generated_targets(
+    tmp_ccx_home, tmp_path, monkeypatch
+):
+    project = tmp_path / "repo"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    main(["init", "--project"])
+
+    settings = json.loads((project / ".vscode" / "settings.json").read_text())
+    generated_targets = [
+        "CLAUDE.md",
+        "AGENTS.md",
+        ".mcp.json",
+        ".claude",
+        ".codex",
+        ".agents",
+        ".ccx/.state",
+        ".ccx/backups",
+    ]
+    for target in generated_targets:
+        assert settings["files.exclude"][target] is True
+        assert settings["search.exclude"][target] is True
 
 
 def test_init_project_appends_to_gitignore(tmp_ccx_home, tmp_path, monkeypatch):

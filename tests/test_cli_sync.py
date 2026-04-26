@@ -66,6 +66,64 @@ def test_sync_dry_run_does_not_write(tmp_ccx_home):
     assert not (tmp_ccx_home / ".claude" / "CLAUDE.md").exists()
 
 
+def test_sync_codex_only_writes_codex_targets(tmp_ccx_home):
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
+        "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
+    )
+
+    assert main(["sync", "--codex"]) == 0
+
+    assert (tmp_ccx_home / ".codex" / "AGENTS.md").is_file()
+    assert (tmp_ccx_home / ".codex" / "config.toml").is_file()
+    assert (tmp_ccx_home / ".codex" / "hooks.json").is_file()
+    assert (tmp_ccx_home / ".agents" / "skills").is_symlink()
+    assert not (tmp_ccx_home / ".claude" / "CLAUDE.md").exists()
+    assert not (tmp_ccx_home / ".claude" / "settings.json").exists()
+    assert not (tmp_ccx_home / ".claude.json").exists()
+
+
+def test_sync_claude_only_writes_claude_targets(tmp_ccx_home):
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
+        "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
+    )
+
+    assert main(["sync", "--claude"]) == 0
+
+    assert (tmp_ccx_home / ".claude" / "CLAUDE.md").is_file()
+    assert (tmp_ccx_home / ".claude" / "settings.json").is_file()
+    assert (tmp_ccx_home / ".claude" / "skills").is_symlink()
+    assert (tmp_ccx_home / ".claude.json").is_file()
+    assert not (tmp_ccx_home / ".codex" / "AGENTS.md").exists()
+    assert not (tmp_ccx_home / ".codex" / "config.toml").exists()
+    assert not (tmp_ccx_home / ".codex" / "hooks.json").exists()
+    assert not (tmp_ccx_home / ".agents" / "skills").exists()
+
+
+def test_sync_codex_only_preserves_existing_claude_manifest_entries(tmp_ccx_home):
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
+        "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
+    )
+    assert main(["sync"]) == 0
+    claude_md = tmp_ccx_home / ".claude" / "CLAUDE.md"
+    claude_settings = tmp_ccx_home / ".claude" / "settings.json"
+    assert claude_md.exists()
+    assert claude_settings.exists()
+
+    assert main(["sync", "--codex"]) == 0
+
+    assert claude_md.exists()
+    assert claude_settings.exists()
+
+
 def test_sync_removes_orphan_when_canonical_entry_gone(tmp_ccx_home):
     # Use .codex/config.toml (owned mode) to test orphan removal.
     main(["init"])
