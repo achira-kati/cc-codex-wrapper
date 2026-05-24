@@ -7,8 +7,16 @@ is much less tested and should be treated as experimental for now.
 
 ## Install
 
+`ccx` is not published to PyPI yet, so install it from this checkout:
+
 ```bash
-uv tool install ccx
+uv tool install .
+```
+
+For development, install it in editable mode:
+
+```bash
+uv tool install --editable . --force
 ```
 
 ## Recommended Project Setup
