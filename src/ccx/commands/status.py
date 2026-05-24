@@ -18,10 +18,13 @@ def run(
     project_root: Path | None,
     *,
     target: TargetFilter = "all",
+    managed_only: bool = False,
 ) -> tuple[int, str]:
     """Return (exit_code, human_readable_summary).
 
     exit_code is 0 if in sync, nonzero if drift detected.
+    managed_only ignores desired targets that are not already in the manifest,
+    which lets clean operate after a target-specific sync.
     """
     user = load_canonical(scopes.user)
     project = load_canonical(scopes.project) if scopes.project else None
@@ -33,6 +36,8 @@ def run(
     )
 
     manifest = Manifest.load(scopes.user / ".state" / "manifest.json")
+    if managed_only:
+        writes = [w for w in writes if str(w.path) in manifest.entries]
 
     drifted: list[Path] = []
     for w in writes:

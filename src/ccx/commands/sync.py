@@ -227,15 +227,14 @@ def _orphans_for_target(
     home: Path,
     project_root: Path | None,
 ) -> set[Path]:
-    if target == "all":
-        return manifest.orphans(desired_paths)
-
     desired_str = {str(p) for p in desired_paths}
     return {
         Path(path)
         for path in manifest.entries
         if path not in desired_str
-        and _path_targets(Path(path), home=home, project_root=project_root) & {target}
+        and _path_matches_target(
+            Path(path), target=target, home=home, project_root=project_root
+        )
     }
 
 
@@ -246,13 +245,26 @@ def _preserve_unselected_entries(
     home: Path,
     project_root: Path | None,
 ) -> dict[str, str]:
-    if target == "all":
-        return {}
     return {
         path: recorded
         for path, recorded in manifest.entries.items()
-        if not (_path_targets(Path(path), home=home, project_root=project_root) & {target})
+        if not _path_matches_target(
+            Path(path), target=target, home=home, project_root=project_root
+        )
     }
+
+
+def _path_matches_target(
+    path: Path,
+    *,
+    target: TargetFilter,
+    home: Path,
+    project_root: Path | None,
+) -> bool:
+    targets = _path_targets(path, home=home, project_root=project_root)
+    if target == "all":
+        return bool(targets)
+    return target in targets
 
 
 def _path_targets(path: Path, *, home: Path, project_root: Path | None) -> set[TargetName]:

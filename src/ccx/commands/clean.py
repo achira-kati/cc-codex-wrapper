@@ -8,7 +8,7 @@ import tomli_w
 
 from ccx.atomic import atomic_write
 from ccx.commands import status as cmd_status
-from ccx.commands.sync import _plan
+from ccx.commands.sync import _path_matches_target, _plan
 from ccx.loader import LoaderError, load_canonical
 from ccx.manifest import Manifest
 from ccx.scope import Scopes
@@ -16,7 +16,9 @@ from ccx.scope import Scopes
 
 def run(scopes: Scopes, home: Path, project_root: Path | None) -> int:
     """Remove generated targets only when status says they are in sync."""
-    status_rc, summary = cmd_status.run(scopes, home=home, project_root=project_root)
+    status_rc, summary = cmd_status.run(
+        scopes, home=home, project_root=project_root, managed_only=True
+    )
     print(summary, end="")
     if status_rc != 0:
         print("Refusing to clean because generated targets are not in sync.", file=sys.stderr)
@@ -33,10 +35,16 @@ def run(scopes: Scopes, home: Path, project_root: Path | None) -> int:
     writes_by_path = {w.path: w for w in writes}
     manifest_path = scopes.user / ".state" / "manifest.json"
     manifest = Manifest.load(manifest_path)
+    remaining_entries = dict(manifest.entries)
 
     removed = 0
     for raw_path, recorded in list(manifest.entries.items()):
         path = Path(raw_path)
+        if not _path_matches_target(
+            path, target="all", home=home, project_root=project_root
+        ):
+            continue
+        remaining_entries.pop(raw_path, None)
         if recorded == "merge":
             write = writes_by_path.get(path)
             if write is not None and _clean_merge_target(path, write.content):
@@ -47,7 +55,7 @@ def run(scopes: Scopes, home: Path, project_root: Path | None) -> int:
             removed += 1
 
     _remove_empty_generated_dirs(home, project_root)
-    Manifest().save(manifest_path)
+    Manifest(entries=remaining_entries).save(manifest_path)
     print(f"removed {removed} generated target(s)")
     return 0
 

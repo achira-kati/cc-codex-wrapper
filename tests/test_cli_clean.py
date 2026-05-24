@@ -62,3 +62,53 @@ def test_clean_aborts_when_status_reports_drift(tmp_ccx_home):
     assert main(["clean"]) != 0
 
     assert generated.read_text() == "manual edit"
+
+
+def test_clean_after_codex_only_sync_ignores_unsynced_claude_targets(tmp_ccx_home):
+    main(["init"])
+    (tmp_ccx_home / ".ccx" / "mcp.yaml").write_text(
+        yaml.dump({"servers": {"s1": {"command": "npx"}}})
+    )
+    (tmp_ccx_home / ".ccx" / "hooks.yaml").write_text(
+        "hooks:\n  SessionStart:\n    - hooks:\n        - command: echo\n"
+    )
+    assert main(["sync", "--codex"]) == 0
+
+    codex_config = tmp_ccx_home / ".codex" / "config.toml"
+    claude_settings = tmp_ccx_home / ".claude" / "settings.json"
+    assert codex_config.is_file()
+    assert not claude_settings.exists()
+
+    assert main(["clean"]) == 0
+
+    assert not codex_config.exists()
+    assert not claude_settings.exists()
+    manifest = Manifest.load(tmp_ccx_home / ".ccx" / ".state" / "manifest.json")
+    assert manifest.entries == {}
+
+
+def test_clean_ignores_manifest_entries_from_other_projects(tmp_ccx_home, tmp_path, monkeypatch):
+    main(["init"])
+    project = tmp_path / "current-project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    main(["init", "--project"])
+    (project / ".ccx" / "AGENTS.md").write_text("# current project")
+    assert main(["sync"]) == 0
+
+    other_project = tmp_path / "other-project"
+    other_target = other_project / "AGENTS.md"
+    other_target.parent.mkdir()
+    other_target.write_text("# other project")
+    manifest_path = tmp_ccx_home / ".ccx" / ".state" / "manifest.json"
+    manifest = Manifest.load(manifest_path)
+    manifest.record(other_target, Manifest.hash_file(other_target))
+    manifest.save(manifest_path)
+
+    assert main(["clean"]) == 0
+
+    assert not (project / "AGENTS.md").exists()
+    assert other_target.exists()
+    manifest = Manifest.load(manifest_path)
+    assert str(project / "AGENTS.md") not in manifest.entries
+    assert manifest.entries[str(other_target)] == Manifest.hash_file(other_target)
