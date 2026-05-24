@@ -31,8 +31,7 @@ def test_replace_with_symlink_creates_link(tmp_path):
     source.mkdir()
     target = tmp_path / "link"
     replace_with_symlink(target, source)
-    assert target.is_symlink()
-    assert target.resolve() == source.resolve()
+    assert target.samefile(source)
 
 
 def test_replace_with_symlink_replaces_existing_symlink(tmp_path):
@@ -41,6 +40,6 @@ def test_replace_with_symlink_replaces_existing_symlink(tmp_path):
     old.mkdir()
     new.mkdir()
     target = tmp_path / "link"
-    target.symlink_to(old)
+    replace_with_symlink(target, old)
     replace_with_symlink(target, new)
-    assert target.resolve() == new.resolve()
+    assert target.samefile(new)

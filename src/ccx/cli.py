@@ -1,12 +1,11 @@
 import argparse
-import os
 import sys
 from pathlib import Path
 
 from ccx import __version__
 from ccx.commands import init as cmd_init
 from ccx.commands import sync as cmd_sync
-from ccx.scope import discover
+from ccx.scope import discover, user_home
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
 
     args, rest = parser.parse_known_args(argv)
 
-    home = Path(os.environ["HOME"])
+    home = user_home()
     scopes = discover()
     project_root = scopes.project.parent if scopes.project else None
 

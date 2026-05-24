@@ -12,7 +12,7 @@ def test_user_scope_cc_writes_include_stub(tmp_path):
 
     claude_md = home / ".claude" / "CLAUDE.md"
     stub = next(w for w in writes if w.path == claude_md)
-    assert f"@{home}/.ccx/AGENTS.md" in stub.content
+    assert f"@{(home / '.ccx' / 'AGENTS.md').as_posix()}" in stub.content
 
 
 def test_user_scope_codex_copies_agents_md(tmp_path):
@@ -59,3 +59,14 @@ def test_project_scope_symlink_planned(tmp_path):
     )
     assert symlink_entry is not None
     assert symlink_entry.symlink_to == proj_root / ".ccx" / "AGENTS.md"
+
+
+def test_project_scope_without_agents_md_skips_memory_targets(tmp_path):
+    home = tmp_path / "home"
+    proj_root = tmp_path / "repo"
+    (proj_root / ".ccx").mkdir(parents=True)
+    project = Canonical(root=proj_root / ".ccx")
+
+    writes = render_memory(user=None, project=project, home=home, project_root=proj_root)
+
+    assert writes == []

@@ -19,6 +19,17 @@ def test_init_creates_scope_directory(tmp_ccx_home):
     assert (scope / ".gitignore").is_file()
 
 
+def test_init_uses_userprofile_when_home_missing(tmp_path, monkeypatch):
+    fake_home = tmp_path / "win-home"
+    fake_home.mkdir()
+    monkeypatch.delenv("HOME", raising=False)
+    monkeypatch.setenv("USERPROFILE", str(fake_home))
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["init"]) == 0
+    assert (fake_home / ".ccx" / "AGENTS.md").is_file()
+
+
 def test_init_starter_agents_describes_ccx_folder(tmp_ccx_home):
     main(["init"])
 

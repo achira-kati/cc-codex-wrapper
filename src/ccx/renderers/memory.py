@@ -30,7 +30,7 @@ def render_memory(
         claude_extras = _read_if_exists(
             (user.claude_passthrough / "CLAUDE.md") if user.claude_passthrough else None
         )
-        stub = f"@{agents_path}\n"
+        stub = f"@{agents_path.as_posix()}\n"
         if claude_extras:
             stub += "\n" + claude_extras
         writes.append(PlannedWrite(path=home / ".claude" / "CLAUDE.md", kind="file", content=stub))
@@ -48,24 +48,28 @@ def render_memory(
 
     if project is not None and project_root is not None:
         # CC project: ./CLAUDE.md is @AGENTS.md stub.
+        project_agents_path = project_root / ".ccx" / "AGENTS.md"
+        has_project_agents = project_agents_path.is_file()
         project_claude_extras = _read_if_exists(
             (project.claude_passthrough / "CLAUDE.md") if project.claude_passthrough else None
         )
-        stub = "@AGENTS.md\n"
-        if project_claude_extras:
-            stub += "\n" + project_claude_extras
-        writes.append(
-            PlannedWrite(path=project_root / "CLAUDE.md", kind="file", content=stub)
-        )
+        if has_project_agents or project_claude_extras:
+            stub = "@AGENTS.md\n" if has_project_agents else ""
+            if project_claude_extras:
+                stub += ("\n" if stub else "") + project_claude_extras
+            writes.append(
+                PlannedWrite(path=project_root / "CLAUDE.md", kind="file", content=stub)
+            )
 
         # Codex project: ./AGENTS.md symlinks to .ccx/AGENTS.md
-        writes.append(
-            PlannedWrite(
-                path=project_root / "AGENTS.md",
-                kind="symlink",
-                symlink_to=project_root / ".ccx" / "AGENTS.md",
+        if has_project_agents:
+            writes.append(
+                PlannedWrite(
+                    path=project_root / "AGENTS.md",
+                    kind="symlink",
+                    symlink_to=project_agents_path,
+                )
             )
-        )
 
     return writes
 

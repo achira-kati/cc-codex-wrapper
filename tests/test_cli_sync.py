@@ -30,7 +30,7 @@ def test_sync_writes_claude_md_include_stub(tmp_ccx_home):
     claude_md = tmp_ccx_home / ".claude" / "CLAUDE.md"
     assert claude_md.is_file()
     content = claude_md.read_text()
-    assert str(tmp_ccx_home / ".ccx" / "AGENTS.md") in content
+    assert (tmp_ccx_home / ".ccx" / "AGENTS.md").as_posix() in content
 
 
 def test_sync_aborts_on_manual_edit_to_managed_file(tmp_ccx_home):
@@ -80,7 +80,7 @@ def test_sync_codex_only_writes_codex_targets(tmp_ccx_home):
     assert (tmp_ccx_home / ".codex" / "AGENTS.md").is_file()
     assert (tmp_ccx_home / ".codex" / "config.toml").is_file()
     assert (tmp_ccx_home / ".codex" / "hooks.json").is_file()
-    assert (tmp_ccx_home / ".agents" / "skills").is_symlink()
+    assert (tmp_ccx_home / ".agents" / "skills").samefile(tmp_ccx_home / ".ccx" / "skills")
     assert not (tmp_ccx_home / ".claude" / "CLAUDE.md").exists()
     assert not (tmp_ccx_home / ".claude" / "settings.json").exists()
     assert not (tmp_ccx_home / ".claude.json").exists()
@@ -99,7 +99,7 @@ def test_sync_claude_only_writes_claude_targets(tmp_ccx_home):
 
     assert (tmp_ccx_home / ".claude" / "CLAUDE.md").is_file()
     assert (tmp_ccx_home / ".claude" / "settings.json").is_file()
-    assert (tmp_ccx_home / ".claude" / "skills").is_symlink()
+    assert (tmp_ccx_home / ".claude" / "skills").samefile(tmp_ccx_home / ".ccx" / "skills")
     assert (tmp_ccx_home / ".claude.json").is_file()
     assert not (tmp_ccx_home / ".codex" / "AGENTS.md").exists()
     assert not (tmp_ccx_home / ".codex" / "config.toml").exists()

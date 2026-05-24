@@ -42,10 +42,14 @@ def run(
     drifted: list[Path] = []
     for w in writes:
         if w.kind == "symlink":
-            if not w.path.is_symlink() or w.symlink_to is None:
+            if not (w.path.exists() or w.path.is_symlink()) or w.symlink_to is None:
                 drifted.append(w.path)
                 continue
-            if w.path.resolve() != w.symlink_to.resolve():
+            try:
+                same_target = w.path.samefile(w.symlink_to)
+            except OSError:
+                same_target = False
+            if not same_target:
                 drifted.append(w.path)
             continue
         if not w.path.exists():

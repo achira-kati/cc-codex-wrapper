@@ -1,4 +1,5 @@
 import os
+import sys
 
 import pytest
 
@@ -11,10 +12,14 @@ def fake_claude_on_path(tmp_path, monkeypatch):
     bindir = tmp_path / "bin"
     bindir.mkdir()
     log = tmp_path / "claude-call.log"
-    script = bindir / "claude"
-    script.write_text(f"#!/bin/sh\necho \"$@\" > {log}\nexit 0\n")
-    script.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bindir}:{os.environ['PATH']}")
+    if sys.platform == "win32":
+        script = bindir / "claude.cmd"
+        script.write_text(f"@echo off\r\necho %* > \"{log}\"\r\nexit /b 0\r\n")
+    else:
+        script = bindir / "claude"
+        script.write_text(f"#!/bin/sh\necho \"$@\" > {log}\nexit 0\n")
+        script.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
     return log
 
 

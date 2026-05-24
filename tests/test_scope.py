@@ -1,4 +1,4 @@
-from ccx.scope import discover
+from ccx.scope import discover, user_home
 
 
 def test_user_scope_always_returns_home_ccx(tmp_path, monkeypatch):
@@ -7,11 +7,26 @@ def test_user_scope_always_returns_home_ccx(tmp_path, monkeypatch):
     assert scopes.user == tmp_path / ".ccx"
 
 
+def test_user_home_falls_back_to_userprofile_when_home_missing(tmp_path, monkeypatch):
+    monkeypatch.delenv("HOME", raising=False)
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    assert user_home() == tmp_path
+
+
 def test_no_project_scope_when_no_dotccx_found(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     subdir = tmp_path / "unrelated"
     subdir.mkdir()
     scopes = discover(cwd=subdir)
+    assert scopes.project is None
+
+
+def test_user_scope_is_not_project_scope(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / ".ccx").mkdir()
+    project = tmp_path / "repo"
+    project.mkdir()
+    scopes = discover(cwd=project)
     assert scopes.project is None
 
 

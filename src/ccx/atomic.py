@@ -1,4 +1,5 @@
 import os
+import subprocess
 from pathlib import Path
 
 
@@ -22,11 +23,31 @@ def atomic_write(target: Path, content: str) -> None:
 
 
 def replace_with_symlink(target: Path, source: Path) -> None:
-    """Make `target` a symlink pointing at `source`, replacing any existing link.
+    """Make `target` a link pointing at `source`, replacing any existing link.
 
     Caller is responsible for backing up a real (non-symlink) target beforehand.
+    On Windows without symlink privileges, falls back to a directory junction or
+    file hardlink so sync can still run in a normal shell.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.is_symlink() or target.exists():
         target.unlink()
-    target.symlink_to(source)
+    try:
+        target.symlink_to(source, target_is_directory=source.is_dir())
+    except OSError as exc:
+        if os.name != "nt" or getattr(exc, "winerror", None) != 1314:
+            raise
+        _replace_with_windows_link(target, source)
+
+
+def _replace_with_windows_link(target: Path, source: Path) -> None:
+    if source.is_dir():
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(target), str(source)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+
+    target.hardlink_to(source)

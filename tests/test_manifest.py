@@ -15,7 +15,7 @@ def test_manifest_roundtrip(tmp_path):
     m.record(Path("/a/b.txt"), "abc123")
     m.save(path)
     loaded = Manifest.load(path)
-    assert loaded.entries == {"/a/b.txt": "abc123"}
+    assert loaded.entries == {str(Path("/a/b.txt")): "abc123"}
 
 
 def test_hash_file(tmp_path):
